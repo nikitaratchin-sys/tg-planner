@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Planner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-secondary-bg-color, #f0f0f6);
+            --card-bg: var(--tg-theme-bg-color, #ffffff);
+            --text-color: var(--tg-theme-text-color, #000000);
+            --accent: var(--tg-theme-button-color, #007aff);
+            --danger: #ff3b30;
+            --secondary-text: var(--tg-theme-hint-color, #8e8e93);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0; padding: 16px; padding-bottom: 100px;
+        }
+
+        /* HEADER */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 24px; padding: 0 4px;
+        }
+        h1 { margin: 0; font-size: 28px; font-weight: 800; }
+        .stats-btn {
+            background: none; border: none; font-size: 24px; cursor: pointer; text-decoration: none;
+        }
+
+        /* TASKS */
+        .task-card {
+            background-color: var(--card-bg);
+            padding: 16px; border-radius: 16px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .task-card:active { transform: scale(0.98); }
+        .task-info { display: flex; flex-direction: column; }
+        .category-tag { 
+            font-size: 11px; color: var(--accent); font-weight: 700; 
+            text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;
+        }
+        .task-title { font-size: 17px; font-weight: 500; }
+        
+        /* Checkbox Circle */
+        .check-circle {
+            width: 28px; height: 28px; border-radius: 50%;
+            border: 2px solid var(--tg-theme-hint-color, #c7c7cc);
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .check-circle:active { background-color: var(--accent); border-color: var(--accent); }
+
+        /* EMPTY STATE */
+        .empty-state {
+            text-align: center; color: var(--secondary-text); margin-top: 60px;
+        }
+        .empty-state div { font-size: 48px; margin-bottom: 10px; }
+
+        /* BOTTOM BAR & FORM */
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: rgba(255, 255, 255, 0.85); /* Glass effect fallback */
+            background: var(--card-bg);
+            padding: 12px 16px; box-sizing: border-box;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: flex; gap: 10px; align-items: center;
+        }
+        
+        .add-input {
+            flex-grow: 1; padding: 12px; border-radius: 12px; border: none;
+            background: var(--bg-color); color: var(--text-color); font-size: 16px;
+            outline: none;
+        }
+        .icon-btn {
+            background: var(--bg-color); border: none; width: 44px; height: 44px;
+            border-radius: 12px; font-size: 20px; color: var(--secondary-text);
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .send-btn {
+            background: var(--accent); color: white; border: none; width: 44px; height: 44px;
+            border-radius: 12px; font-size: 20px; display: flex; align-items: center; justify-content: center;
+        }
+
+        /* MODAL FOR CATEGORIES */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 200;
+            display: none; align-items: flex-end; /* Sheet style */
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-content {
+            background: var(--card-bg); width: 100%; border-radius: 20px 20px 0 0;
+            padding: 20px; padding-bottom: 40px;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .cat-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid var(--bg-color);
+        }
+        .delete-btn { color: var(--danger); text-decoration: none; font-weight: 500;}
+        .new-cat-form { display: flex; gap: 10px; margin-top: 20px;}
+        .close-modal { 
+            width: 40px; height: 4px; background: #ccc; border-radius: 2px; 
+            margin: 0 auto 20px auto; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <div style="font-size: 14px; color: var(--secondary-text); text-transform: uppercase; font-weight: 600;">Сегодня</div>
+            <h1>Задачи</h1>
+        </div>
+        <a href="/stats" class="stats-btn">📊</a>
+    </div>
+
+    <div id="tasks-list">
+        {% if not tasks %}
+            <div class="empty-state">
+                <div>🎉</div>
+                <p>Все задачи выполнены<br>или ещё не созданы.</p>
+            </div>
+        {% endif %}
+
+        {% for task in tasks %}
+        <div class="task-card" id="task-{{ task.id }}">
+            <div class="task-info">
+                <span class="category-tag">{{ task.category.name }}</span>
+                <span class="task-title">{{ task.title }}</span>
+            </div>
+            <a href="/complete/{{ task.id }}" onclick="animateComplete(event, {{ task.id }})">
+                <div class="check-circle"></div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form class="bottom-bar" action="/add" method="post">
+        <button type="button" class="icon-btn" onclick="openModal()">📂</button>
+        
+        <select name="category_id" class="add-input" style="max-width: 100px; margin-right: 5px;" required>
+            {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+
+        <input type="text" name="title" class="add-input" placeholder="Новая задача..." required autocomplete="off">
+        <button type="submit" class="send-btn">➤</button>
+    </form>
+
+    <div class="modal-overlay" id="catModal" onclick="if(event.target === this) closeModal()">
+        <div class="modal-content">
+            <div class="close-modal" onclick="closeModal()"></div>
+            <h2>Блоки задач</h2>
+            
+            <div style="max-height: 200px; overflow-y: auto;">
+                {% for cat in categories %}
+                <div class="cat-row">
+                    <span>{{ cat.name }}</span>
+                    {% if categories|length > 1 %}
+                        <a href="/category/delete/{{ cat.id }}" class="delete-btn">Удалить</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <form class="new-cat-form" action="/category/add" method="post">
+                <input type="text" name="name" class="add-input" style="background: var(--bg-color)" placeholder="Новый блок..." required>
+                <button type="submit" class="send-btn">+</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand(); 
+        
+        // Функция анимации перед уходом по ссылке
+        function animateComplete(e, id) {
+            e.preventDefault(); // Остановить переход сразу
+            const card = document.getElementById('task-' + id);
+            card.style.transform = 'scale(0.95)';
+            card.style.opacity = '0';
+            
+            // Ждем завершения анимации и переходим
+            setTimeout(() => {
+                window.location.href = e.currentTarget.href;
+            }, 200);
+        }
+
+        function openModal() { document.getElementById('catModal').classList.add('open'); }
+        function closeModal() { document.getElementById('catModal').classList.remove('open'); }
+    </script>
+</body>
+</html>
